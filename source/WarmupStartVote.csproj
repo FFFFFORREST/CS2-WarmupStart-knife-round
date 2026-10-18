@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>WarmupStartVote</AssemblyName>
+    <RootNamespace>WarmupStartVote</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="CounterStrikeSharp.API">
+      <HintPath>lib/CounterStrikeSharp.API.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
