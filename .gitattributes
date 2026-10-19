@@ -1,0 +1,3 @@
+# Keep LF everywhere so install.sh and the cfgs work on the Linux server
+# even when the repo is cloned on Windows.
+* text=auto eol=lf

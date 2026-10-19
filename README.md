@@ -1,4 +1,4 @@
-# WarmupStartVote v1.2.0 — 无限热身 + 开赛投票 + 刀战选边 + .drop 发刀
+# WarmupStartVote v1.2.2 — 无限热身 + 开赛投票 + 刀战选边 + .drop 发刀
 
 适用：AWS Lightsail / Ubuntu 24.04、CS2 Dedicated Server、CounterStrikeSharp v1.0.376（.NET 10）。**与 RockTheVote-CSS 独立，不占用其 `!rtv`、`!nominate`、`!votemap`、`!maps` 命令。**
 
@@ -13,7 +13,7 @@
 5. 刀战胜方成员任选一人输入 `!stay`（保持当前 CT/T）或 `!swap`（CT/T 交换）；获胜队先输入的有效选择生效。其他玩家不能替获胜队决定。
 6. 选边后执行 `live.cfg`，**比分归零、恢复 $800 初始经济、正常买枪规则，MR12 正式比赛开始**。
 7. 刀战结束后如果获胜队 30 秒内没有选边，默认 `!stay`，自动开赛，避免卡住。
-8. 正式比赛结束后，插件尝试恢复无限热身；RockTheVote 切换新地图后也会恢复无限热身。
+8. 正式比赛结束、出现结算画面 15 秒后，插件会重新加载当前地图，回到无限热身（玩家不会被踢出服务器）。如果 RockTheVote 在这之前已经切换到新地图，就以 RockTheVote 选的地图为准，同样进入无限热身。
 9. 投票、刀战、选边或正式比赛进行中，如果真人玩家全部退出，插件会自动回到无限热身，不会卡在比赛状态。
 
 **单人测试例外：** 若在线仅一名真人，或者所有真人都处在同一队，无法进行有胜负的刀战。此时 `!votestart` + `!yes` 会**跳过刀战直接执行 `live.cfg`**，保持原先允许单人测试的规则。需要至少 T、CT 双方各一名真人，才能测试刀战与选边。插件不会自动填充机器人。
@@ -37,14 +37,14 @@
 
 ## 三、安装 / 从 v1.0 升级
 
-你如果还没安装上一版 `WarmupStartVote.zip`，直接安装本版即可。如果已安装 v1.0 / v1.1 / v1.1.1，`install.sh` 会在**编译成功后**停止 CS2、替换旧 DLL，备份 `server.cfg`、`practice.cfg`、`live.cfg`、`knife.cfg` 和旧插件 DLL，然后重启。部署中途出错时脚本会自动把 CS2 重新拉起来，不会让服务器一直停着。
+你如果还没安装上一版 `WarmupStartVote.zip`，直接安装本版即可。如果已安装旧版（v1.0 ~ v1.2.1），`install.sh` 会在**编译成功后**停止 CS2、替换旧 DLL，备份 `server.cfg`、`practice.cfg`、`live.cfg`、`knife.cfg` 和旧插件 DLL，然后重启。部署中途出错时脚本会自动把 CS2 重新拉起来，不会让服务器一直停着。
 
 ### 1. 将本 ZIP 上传到 Lightsail
 
 用 Windows PowerShell（**电脑本地**）运行，替换路径和 IP：
 
 ```powershell
-scp -i "C:\path\to\LightsailDefaultKey-us-east-1.pem" "C:\path\to\WarmupStartVote_v1.2.0_knife.zip" ubuntu@你的静态IP:/home/ubuntu/
+scp -i "C:\path\to\LightsailDefaultKey-us-east-1.pem" "C:\path\to\WarmupStartVote_v1.2.2_knife.zip" ubuntu@你的静态IP:/home/ubuntu/
 ```
 
 或者用 WinSCP/SFTP 把 ZIP 传到 `/home/ubuntu/`。
@@ -61,7 +61,7 @@ cd /home/ubuntu
 ```
 
 ```bash
-unzip -o WarmupStartVote_v1.2.0_knife.zip
+unzip -o WarmupStartVote_v1.2.2_knife.zip
 ```
 
 ```bash
@@ -119,6 +119,7 @@ sudo ls -lh /home/steam/cs2/game/csgo/addons/counterstrikesharp/plugins/WarmupSt
 - `SidePickSeconds = 30f` — 胜方选边时限，超时默认留边
 - `ResetPermission = "@css/generic"` — 使用 `!startreset` 所需的管理员权限
 - `DropKnifeCount = 5` — 每次 `.drop` 掉几把刀
+- `MatchEndReloadSeconds = 15f` — 比赛结束后多少秒重新加载地图。应大于 RockTheVote 的 `DelayToChangeInTheEnd`（默认 6 秒）
 - `DropCooldownSeconds = 30` — 热身、投票、选边阶段 `.drop` 的冷却时间（正式比赛中改为每回合一次）
 
 修改后再运行 `bash install.sh` 重新编译部署。
@@ -128,6 +129,8 @@ sudo ls -lh /home/steam/cs2/game/csgo/addons/counterstrikesharp/plugins/WarmupSt
 - `practice.cfg` — 无限热身、随地免费购买
 - `knife.cfg` — 刀局规则、只给刀、禁止购买和炸弹
 - `live.cfg` — 选边后 MR12、比分重置、恢复经济
+
+三个 cfg 都默认**关闭友伤**（`mp_friendlyfire 0`）。想在某个阶段开启友伤，就把对应 cfg 里的这一行改成 `mp_friendlyfire 1`。
 
 不建议在 `server.cfg` 额外写 `exec knife.cfg` 或 `exec live.cfg`；插件会自动调用。
 
@@ -176,3 +179,16 @@ sudo systemctl start cs2
 - 发的是 `weapon_knife`。CS2 通常会换成发起者库存里装备的那把刀（带皮肤），所以别人捡到的是你的刀。**这一点取决于 CS2 本身，请实测确认**；如果捡到的只是默认刀，说明当前版本的 CS2 不会这样替换。
 - 捡刀：玩家手里已经有刀时，需要对着地上的刀按 E 交换，或者先按 G 丢掉自己的刀再走过去。为此 `practice.cfg` 和 `live.cfg` 开启了 `mp_drop_knife_enable 1`，`knife.cfg` 中关闭。
 - 限制：必须活着并在 T/CT；刀战（等待开始和进行中）不可用；正式比赛每回合每人一次；热身、投票、选边阶段每人冷却 30 秒（热身是一个不会结束的回合，按回合限制会变成整个热身只能用一次）。
+
+## 十、v1.2.1 修复：比赛结束后卡在结算画面
+
+- **原因**：旧版在比赛结束 8 秒后执行 `practice.cfg`。但这个 cfg 无法退出 CS2 的结算（Game Over）状态，右上角会显示 Warmup，画面却一直停在 VICTORY / 比分界面。服务器没有配置地图轮换时，CS2 自己也不会换图。
+- **现在**：比赛结束 15 秒后执行 `changelevel 当前地图` 重新加载（创意工坊地图改用 `ds_workshop_changelevel`，要求地图在服务器托管的创意工坊合集里）。换图后插件自动进入无限热身，玩家留在服务器里，**不需要重启服务器进程**。
+- **与 RockTheVote 的配合**：如果 RockTheVote 的结束投票选出了下一张图，并在结算后 `DelayToChangeInTheEnd` 秒切过去，插件的重载会自动取消。
+- **建议检查 RockTheVote 配置**：它的 `EndOfMapVote.ChangeMapImmediatly` 默认是 `true`，含义是投票一结束就立刻换图，会在正式比赛还剩 `TriggerRoundsBeforEnd` 回合时直接切图。建议改成 `false`，让它在比赛结束后再换图。另外，比赛如果提前分出胜负（例如 13:0），可能还没到投票触发的回合就结束了，这时由本插件负责重载地图。
+
+## 十一、v1.2.2：默认关闭友伤
+
+- `practice.cfg`、`knife.cfg`、`live.cfg` 都加入了 `mp_friendlyfire 0` 和 `mp_teammates_are_enemies 0`。热身、刀战、正式比赛中，打队友（包括手雷、燃烧弹）都不掉血。
+- CS2 竞技模式默认开启友伤，每次换图会恢复成开启。不过 `server.cfg` 和插件在换图后都会执行 `practice.cfg`，所以仍然是关闭的。
+- 插件代码除版本号外没有改动。只更新 cfg 的话，替换服务器上 `cfg/` 目录里的三个文件即可，不需要重新编译。

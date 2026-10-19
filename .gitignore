@@ -1,0 +1,4 @@
+# Build output and the CounterStrikeSharp API copied in by install.sh
+source/bin/
+source/obj/
+source/lib/

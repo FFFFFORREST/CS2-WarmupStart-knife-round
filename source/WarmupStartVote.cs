@@ -18,7 +18,7 @@ namespace WarmupStartVote;
 public sealed class WarmupStartVotePlugin : BasePlugin
 {
     public override string ModuleName => "Warmup Start Vote";
-    public override string ModuleVersion => "1.2.0";
+    public override string ModuleVersion => "1.2.2";
     public override string ModuleAuthor => "CS2 community server";
     public override string ModuleDescription => "Free warmup, start vote, knife round, winning-team side pick, live match";
 
@@ -27,6 +27,8 @@ public sealed class WarmupStartVotePlugin : BasePlugin
     private const float StartVoteSeconds = 25f;
     private const int StartVoteCooldownSeconds = 30;
     private const float SidePickSeconds = 30f;
+    // Longer than RockTheVote's DelayToChangeInTheEnd (default 6s) so its map change goes first.
+    private const float MatchEndReloadSeconds = 15f;
     private const string ResetPermission = "@css/generic";
     private const int DropKnifeCount = 5;
     // Warmup is one endless round, so outside a live match .drop uses a time cooldown.
@@ -43,7 +45,6 @@ public sealed class WarmupStartVotePlugin : BasePlugin
     private int _knifeWinnerTeam;
     private int _voteSerial;
     private int _sideSerial;
-    private int _matchSerial;
     private DateTimeOffset _lastVoteFailed = DateTimeOffset.MinValue;
     private int _roundSerial;
     private readonly Dictionary<ulong, int> _dropRound = new();
@@ -528,7 +529,6 @@ public sealed class WarmupStartVotePlugin : BasePlugin
         _phase = MatchPhase.Warmup;
         ClearBallots();
         ++_sideSerial;
-        ++_matchSerial;
         _knifeWinners.Clear();
         _knifeWinnerTeam = 0;
         _lastVoteFailed = DateTimeOffset.MinValue;
@@ -546,13 +546,25 @@ public sealed class WarmupStartVotePlugin : BasePlugin
     [GameEventHandler]
     public HookResult OnMatchWinPanel(EventCsWinPanelMatch e, GameEventInfo info)
     {
-        if (_phase != MatchPhase.Live) return HookResult.Continue;
-        int serial = ++_matchSerial;
-        AddTimer(8f, () =>
+        // Running practice.cfg can't leave the game-over screen, and without a
+        // map cycle CS2 stays there; reload the map so OnMapStart restores warmup.
+        // The timer dies on map change, so a map picked by RockTheVote wins.
+        var map = Server.MapName;
+        Server.PrintToChatAll($"[StartVote] Match over. Reloading the map in {MatchEndReloadSeconds:0}s for free warmup.");
+        AddTimer(MatchEndReloadSeconds, () =>
         {
-            if (_phase != MatchPhase.Live || serial != _matchSerial) return;
-            ReturnToWarmup("Match finished. Free warmup restored.");
+            if (Server.MapName != map) return;
+            ReloadMap(map);
         }, TimerFlags.STOP_ON_MAPCHANGE);
         return HookResult.Continue;
+    }
+
+    private static void ReloadMap(string map)
+    {
+        // Workshop maps aren't valid changelevel targets; ds_workshop_changelevel
+        // handles maps from the server's hosted workshop collection.
+        Server.ExecuteCommand(Server.IsMapValid(map)
+            ? $"changelevel {map}"
+            : $"ds_workshop_changelevel {map}");
     }
 }
